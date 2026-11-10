@@ -6,7 +6,7 @@ BIN_DIR = bin/
 C_INCLUDES += -Idmcp -Isrc -I../core
 C_SOURCES += dmcp/sys/pgm_syscalls.c
 ASM_SOURCES = dmcp/startup_pgm.s
-C_SOURCES += src/main.c ../core/num.c ../core/ops.c ../core/prog.c ../core/exec.c ../core/ui.c
+C_SOURCES += src/main.c ../core/num.c ../core/ops.c ../core/prog.c ../core/exec.c ../core/ui.c ../core/timemod.c
 
 CC = arm-none-eabi-gcc
 AS = arm-none-eabi-gcc -x assembler-with-cpp

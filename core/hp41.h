@@ -52,12 +52,16 @@ typedef struct {
   const char *info;           /* optional small text line (e.g. menu title), may be NULL */
 } hp41_disp_t;
 
+typedef struct { int year, month, day, hour, min, sec, csec; } hp41_time_t;
+
 /* Platform services, set by the front-end */
 typedef struct {
   void (*beep)(int freq_hz, int ms);   /* may be NULL */
   uint32_t (*ms)(void);                /* monotonic milliseconds */
   void (*power_off)(void);             /* OFF executed */
   void (*keep_on)(int on);             /* ON (continuous on) flag 44 */
+  void (*get_time)(hp41_time_t *t);    /* real time clock, may be NULL */
+  void (*set_time)(const hp41_time_t *t);
 } hp41_platform_t;
 
 void hp41_set_platform(const hp41_platform_t *p);
@@ -70,7 +74,7 @@ void     hp41_master_clear(void);   /* MEMORY LOST */
 
 void hp41_key(int key);          /* key code >0 pressed, 0 released */
 void hp41_tick(void);            /* call often; handles PSE, catalogs, NULL timing */
-int  hp41_busy(void);            /* bits: 1 running, 2 pause, 4 catalog, 8 key held */
+int  hp41_busy(void);            /* bits: 1 running, 2 pause, 4 catalog, 8 key held, 16 CLOCK shown, 32 scrolling, 64 stopwatch running */
 void hp41_run_slice(int steps);  /* execute some program steps if running */
 void hp41_get_display(hp41_disp_t *d);
 void hp41_wakeup(void);          /* called after power on */
@@ -79,7 +83,8 @@ int  hp41_display_text(char *buf, int len); /* ASCII rendering of the 12 cells, 
 int  hp41_shift_active(void);
 void hp41_clear_shift(void);
 void hp41_set_lowbat(int low);
-int  hp41_wants_off(void);       /* OFF executed since last call */
+int  hp41_wants_off(void);
+int  hp41_check_alarms(void);    /* call each minute when off: 1 = an alarm went off, turn on */       /* OFF executed since last call */
 void hp41_goto_new_program(void);/* GTO .. (used before importing a listing) */
 
 /* Program import/export as plain text listing (one instruction per line) */

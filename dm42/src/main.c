@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 #include <main.h>
 #include <dmcp.h>
@@ -24,7 +25,21 @@ static void p_beep(int f, int ms) {
 static uint32_t p_ms(void) { return sys_current_ms(); }
 static int keep_on;
 static void p_keep_on(int on) { keep_on = on; }
-static const hp41_platform_t plat = { p_beep, p_ms, 0, p_keep_on };
+static void p_get_time(hp41_time_t *t) {
+  tm_t tm; dt_t dt;
+  rtc_read(&tm, &dt);
+  t->year = dt.year; t->month = dt.month; t->day = dt.day;
+  t->hour = tm.hour; t->min = tm.min; t->sec = tm.sec; t->csec = tm.csec;
+}
+static void p_set_time(const hp41_time_t *t) {
+  tm_t tm; dt_t dt;
+  rtc_read(&tm, &dt);
+  dt.year = (uint16_t)t->year; dt.month = (uint8_t)t->month; dt.day = (uint8_t)t->day;
+  tm.hour = (uint8_t)t->hour; tm.min = (uint8_t)t->min; tm.sec = (uint8_t)t->sec; tm.csec = 0;
+  tm.dow = (uint8_t)(julian_day(&dt) % 7 + 1);
+  rtc_write(&tm, &dt);
+}
+static const hp41_platform_t plat = { p_beep, p_ms, 0, p_keep_on, p_get_time, p_set_time };
 
 static void blk(int x, int y, int w, int h) { if (w > 0 && h > 0) lcd_fill_rect(x, y, w, h, 1); }
 #include "seg14.inc"
@@ -55,16 +70,48 @@ static void redraw(void) {
   hp41_get_display(&d);
   lcd_clear_buf();
 
-  /* header */
-  lcd_writeClr(t20);
-  t20->newln = 0;
-  lcd_putsR(t20, " HP-41CV ");
-  if (d.info) {
-    char b[24];
-    t20->x = 120;
-    lcd_puts(t20, ascii_label(d.info, b, sizeof b));
+  /* header: time and date on the left, menu title in the middle, battery on the right */
+  {
+    const int hh = lcd_lineHeight(t20);
+    lcd_fill_rect(0, 0, LCD_X, hh, 1);
+    tm_t tm; dt_t dt;
+    rtc_read(&tm, &dt);
+    char b[40];
+    int h = tm.hour, pm = 0;
+    if (!ST(STAT_CLK24)) { pm = h >= 12; h %= 12; if (!h) h = 12; }
+    int n = snprintf(b, sizeof b, ST(STAT_CLK24) ? "%02d:%02d  " : "%d:%02d%s  ", h, tm.min, pm ? "pm" : "am");
+    if (ST(STAT_YMD)) snprintf(b + n, sizeof b - n, "%04d-%02d-%02d", dt.year, dt.month, dt.day);
+    else if (ST(STAT_DMY)) snprintf(b + n, sizeof b - n, "%d.%d.%04d", dt.day, dt.month, dt.year);
+    else snprintf(b + n, sizeof b - n, "%d/%d/%04d", dt.month, dt.day, dt.year);
+    t20->newln = 0; t20->lnfill = 0;
+    lcd_setXY(t20, 4, 0);
+    lcd_putsR(t20, b);
+    if (d.info) {
+      char ib[24];
+      ascii_label(d.info, ib, sizeof ib);
+      lcd_setXY(t20, 236 - lcd_textWidth(t20, ib) / 2, 0);
+      lcd_putsR(t20, ib);
+    }
+    /* battery */
+    int bx = LCD_X - 30, by = (hh - 12) / 2;
+    if (usb_powered()) {
+      lcd_setXY(t20, bx - 12, 0);
+      lcd_putsR(t20, "USB");
+    } else {
+      int mv = get_vbat();
+      snprintf(b, sizeof b, "%d.%dV", mv / 1000, (mv % 1000) / 100);
+      lcd_setXY(t20, bx - 6 - lcd_textWidth(t20, b), 0);
+      lcd_putsR(t20, b);
+      int lvl = (mv - 2500) * 20 / 600;          /* 2.5 V empty .. 3.1 V full */
+      if (lvl < 0) lvl = 0;
+      if (lvl > 20) lvl = 20;
+      lcd_fill_rect(bx, by, 24, 12, 0);           /* outline */
+      lcd_fill_rect(bx + 24, by + 3, 3, 6, 0);    /* tip */
+      lcd_fill_rect(bx + 2, by + 2, 20, 8, 1);
+      if (!get_lowbat_state() || (sys_current_ms() / 500) % 2) lcd_fill_rect(bx + 2, by + 2, lvl, 8, 0);
+    }
+    t20->lnfill = 1; t20->newln = 1;
   }
-  t20->newln = 1;
 
   /* LCD window frame */
   int y0 = 52;
@@ -278,6 +325,7 @@ void program_main(void) {
     lcd_clear_buf(); lcd_putsAt(t24, 2, "Not enough memory"); lcd_refresh();
     for (;;) sys_sleep();
   }
+  SET_ST(STAT_CLK_WKUP_ENABLE);        /* wake up each minute: header clock, alarms */
   int restored = load_state();
   hp41_attach_state(state, restored);
   hp41_set_lowbat(get_lowbat_state());
@@ -286,9 +334,31 @@ void program_main(void) {
   uint32_t last_draw = 0;
   for (;;) {
     int busy = hp41_busy();
-    if ((ST(STAT_PGM_END) && ST(STAT_SUSPENDED)) || (!ST(STAT_PGM_END) && key_empty() && !busy)) {
+    /* CLOCK display only needs one update per second: sleep between them */
+    int clock_only = busy == 16;
+    if (clock_only) SET_ST(STAT_CLK_WKUP_SECONDS); else CLR_ST(STAT_CLK_WKUP_SECONDS);
+    if ((ST(STAT_PGM_END) && ST(STAT_SUSPENDED)) || (!ST(STAT_PGM_END) && key_empty() && (!busy || clock_only))) {
       CLR_ST(STAT_RUNNING);
       sys_sleep();
+    }
+
+    if (ST(STAT_CLK_WKUP_FLAG)) {
+      CLR_ST(STAT_CLK_WKUP_FLAG);
+      if (ST(STAT_OFF)) {
+        if (hp41_check_alarms()) {       /* alarm while off: turn on */
+          CLR_ST(STAT_PGM_END);
+          CLR_ST(STAT_SUSPENDED);
+          LCD_power_on();
+          rtc_wakeup_delay();
+          CLR_ST(STAT_OFF);
+          reset_auto_off();
+          redraw();
+        }
+        continue;
+      }
+      hp41_tick();
+      redraw();
+      if (key_empty() && !(hp41_busy() & ~16)) continue;
     }
 
     if (ST(STAT_PGM_END) || ST(STAT_SUSPENDED)) {

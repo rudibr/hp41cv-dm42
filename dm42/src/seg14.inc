@@ -85,43 +85,61 @@ static uint16_t seg_of(uint8_t c) {
 }
 
 
-static void seg_line(int x0, int y0, int x1, int y1, int t) {
-  int dx = abs(x1 - x0), dy = abs(y1 - y0);
-  int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-  int e = dx - dy;
-  for (;;) {
-    blk(x0, y0, t, t);
-    if (x0 == x1 && y0 == y1) break;
-    int e2 = 2 * e;
-    if (e2 > -dy) { e -= dy; x0 += sx; }
-    if (e2 < dx) { e += dx; y0 += sy; }
+/* ---- polygon segments, HP-41 style: thin strokes with small gaps ---- */
+typedef struct { float x, y; } pt_t;
+
+static void fill_poly(const pt_t *p, int n, int ox, int oy) {
+  float ymin = p[0].y, ymax = p[0].y;
+  for (int i = 1; i < n; i++) { if (p[i].y < ymin) ymin = p[i].y; if (p[i].y > ymax) ymax = p[i].y; }
+  for (int y = (int)ymin; y <= (int)ymax + 1; y++) {
+    float yc = y + 0.5f, xs[8]; int k = 0;
+    for (int i = 0; i < n && k < 8; i++) {
+      pt_t a = p[i], b = p[(i + 1) % n];
+      if ((a.y <= yc && b.y > yc) || (b.y <= yc && a.y > yc))
+        xs[k++] = a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y);
+    }
+    for (int i = 1; i < k; i++) for (int j = i; j > 0 && xs[j-1] > xs[j]; j--) { float t = xs[j]; xs[j] = xs[j-1]; xs[j-1] = t; }
+    for (int i = 0; i + 1 < k; i += 2) {
+      int x0 = (int)(xs[i] + 0.5f), x1 = (int)(xs[i+1] + 0.5f);
+      if (x1 > x0) blk(ox + x0, oy + y, x1 - x0, 1);
+    }
   }
 }
 
-#define CW 24   /* char width  */
-#define CH 46   /* char height */
-#define CT 4    /* stroke */
+static void thick(float x0, float y0, float x1, float y1, float t, int ox, int oy) {
+  float dx = x1 - x0, dy = y1 - y0, l = sqrtf(dx * dx + dy * dy);
+  float nx = -dy / l * t / 2, ny = dx / l * t / 2;
+  pt_t p[4] = { { x0 + nx, y0 + ny }, { x1 + nx, y1 + ny }, { x1 - nx, y1 - ny }, { x0 - nx, y0 - ny } };
+  fill_poly(p, 4, ox, oy);
+}
+
+#define CW 24    /* char width  */
+#define CH 40    /* char height */
 #define CPITCH 32
 
 static void draw_char(int x, int y, uint8_t c, uint8_t p) {
   uint16_t s = seg_of(c);
-  const int W = CW, H = CH, t = CT, h2 = H / 2;
-  if (s & SA)  blk(x + 2, y, W - 4, t);
-  if (s & SD)  blk(x + 2, y + H - t, W - 4, t);
-  if (s & SG1) blk(x + 2, y + h2 - t / 2, W / 2 - 2, t);
-  if (s & SG2) blk(x + W / 2, y + h2 - t / 2, W / 2 - 2, t);
-  if (s & SF)  blk(x, y + 2, t, h2 - 3);
-  if (s & SB)  blk(x + W - t, y + 2, t, h2 - 3);
-  if (s & SE)  blk(x, y + h2 + 1, t, h2 - 3);
-  if (s & SC)  blk(x + W - t, y + h2 + 1, t, h2 - 3);
-  if (s & SI)  blk(x + W / 2 - t / 2, y + t + 1, t, h2 - t - 3);
-  if (s & SL)  blk(x + W / 2 - t / 2, y + h2 + t / 2 + 1, t, h2 - t - 3);
-  if (s & SH)  seg_line(x + t, y + t + 1, x + W / 2 - 3, y + h2 - 4, 3);
-  if (s & SJ)  seg_line(x + W - t - 3, y + t + 1, x + W / 2, y + h2 - 4, 3);
-  if (s & SK)  seg_line(x + W / 2 - 3, y + h2 + 2, x + t, y + H - t - 4, 3);
-  if (s & SM)  seg_line(x + W / 2, y + h2 + 2, x + W - t - 3, y + H - t - 4, 3);
-  if (p == '.' || p == ',') blk(x + W + 3, y + H - t, t, t);
-  if (p == ',') seg_line(x + W + 5, y + H, x + W + 2, y + H + 5, 2);
-  if (p == ':') { blk(x + W + 3, y + H / 3, t, t); blk(x + W + 3, y + 2 * H / 3, t, t); }
+  const float W = CW, H = CH, t = 3.2f, g = 1.2f, h2 = H / 2, m = W / 2;
+  if (s & SA) { pt_t q[4] = { { t/2+g, 0 }, { W-t/2-g, 0 }, { W-t-g, t }, { t+g, t } }; fill_poly(q, 4, x, y); }
+  if (s & SD) { pt_t q[4] = { { t+g, H-t }, { W-t-g, H-t }, { W-t/2-g, H }, { t/2+g, H } }; fill_poly(q, 4, x, y); }
+  if (s & SG1) { pt_t q[6] = { { t/2+g, h2 }, { t+g, h2-t/2 }, { m-g, h2-t/2 }, { m-g+0.01f, h2+t/2 }, { t+g, h2+t/2 }, { t/2+g, h2 } }; fill_poly(q, 5, x, y); }
+  if (s & SG2) { pt_t q[5] = { { m+g, h2-t/2 }, { W-t-g, h2-t/2 }, { W-t/2-g, h2 }, { W-t-g, h2+t/2 }, { m+g, h2+t/2 } }; fill_poly(q, 5, x, y); }
+  if (s & SF) { pt_t q[5] = { { 0, t/2+g }, { t, t+g }, { t, h2-t/2-g }, { t/2, h2-g }, { 0, h2-t/2-g } }; fill_poly(q, 5, x, y); }
+  if (s & SB) { pt_t q[5] = { { W, t/2+g }, { W-t, t+g }, { W-t, h2-t/2-g }, { W-t/2, h2-g }, { W, h2-t/2-g } }; fill_poly(q, 5, x, y); }
+  if (s & SE) { pt_t q[5] = { { 0, h2+t/2+g }, { t/2, h2+g }, { t, h2+t/2+g }, { t, H-t-g }, { 0, H-t/2-g } }; fill_poly(q, 5, x, y); }
+  if (s & SC) { pt_t q[5] = { { W, h2+t/2+g }, { W-t/2, h2+g }, { W-t, h2+t/2+g }, { W-t, H-t-g }, { W, H-t/2-g } }; fill_poly(q, 5, x, y); }
+  if (s & SI) { pt_t q[4] = { { m-t/2, t+g }, { m+t/2, t+g }, { m+t/2, h2-t/2-g }, { m-t/2, h2-t/2-g } }; fill_poly(q, 4, x, y); }
+  if (s & SL) { pt_t q[4] = { { m-t/2, h2+t/2+g }, { m+t/2, h2+t/2+g }, { m+t/2, H-t-g }, { m-t/2, H-t-g } }; fill_poly(q, 4, x, y); }
+  const float dt = 3.2f, e = 1.0f;
+  if (s & SH) thick(t+e+0.8f, t+e+1.5f, m-t/2-e, h2-t/2-e-0.5f, dt, x, y);
+  if (s & SJ) thick(W-t-e-0.8f, t+e+1.5f, m+t/2+e, h2-t/2-e-0.5f, dt, x, y);
+  if (s & SK) thick(m-t/2-e, h2+t/2+e+0.5f, t+e+0.8f, H-t-e-1.5f, dt, x, y);
+  if (s & SM) thick(m+t/2+e, h2+t/2+e+0.5f, W-t-e-0.8f, H-t-e-1.5f, dt, x, y);
+  if (p == '.' || p == ',') { pt_t q[4] = { { W+3, H-3.4f }, { W+6.4f, H-3.4f }, { W+6.4f, H }, { W+3, H } }; fill_poly(q, 4, x, y); }
+  if (p == ',') thick(W+5.6f, H, W+3.2f, H+5, 2.2f, x, y);
+  if (p == ':') {
+    pt_t q1[4] = { { W+3, H*0.3f }, { W+6.4f, H*0.3f }, { W+6.4f, H*0.3f+3.4f }, { W+3, H*0.3f+3.4f } }; fill_poly(q1, 4, x, y);
+    pt_t q2[4] = { { W+3, H*0.65f }, { W+6.4f, H*0.65f }, { W+6.4f, H*0.65f+3.4f }, { W+3, H*0.65f+3.4f } }; fill_poly(q2, 4, x, y);
+  }
 }
 

@@ -9,7 +9,9 @@ static uint32_t ms(void) { return clk; }
 static void beep(int f, int m) { (void)f; (void)m; }
 static int offs;
 static void poff(void) { offs++; }
-static const hp41_platform_t plat = { beep, ms, poff, 0 };
+static void gt(hp41_time_t *t) { uint32_t s = clk / 1000 + 75600; t->year = 2026; t->month = 11; t->day = 10 + s / 86400; s %= 86400; t->hour = s / 3600; t->min = s / 60 % 60; t->sec = s % 60; t->csec = clk / 10 % 100; }
+static void st_(const hp41_time_t *t) { (void)t; }
+static const hp41_platform_t plat = { beep, ms, poff, 0, gt, st_ };
 
 static const char *names[] = { "", "S+","INV","SQRT","LOG","LN","XEQ","STO","RCL","RDN","SIN","COS","TAN",
   "ENTER","SWAP","CHS","E","BSP","UP","7","8","9","DIV","DOWN","4","5","6","MUL",
@@ -25,7 +27,7 @@ static int keycode(const char *t) {
   return -1;
 }
 
-static void settle(void) {
+void settle(void) {
   for (int i = 0; i < 100000 && (hp41_busy() & 3); i++) { clk += 5; hp41_tick(); hp41_run_slice(50); }
 }
 
@@ -39,6 +41,15 @@ void keys(const char *seq) {
     hp41_key(0); clk += 20; hp41_tick();
     settle();
   }
+}
+
+static char held[64];
+void hold(int k, int ms_) {
+  hp41_key(k);
+  for (int t = 0; t < ms_; t += 10) { clk += 10; hp41_tick(); }
+  hp41_display_text(held, sizeof held);
+  hp41_key(0); clk += 20; hp41_tick();
+  settle();
 }
 
 const char *disp(void) { static char b[64]; hp41_display_text(b, sizeof b); return b; }

@@ -18,7 +18,7 @@ int arg_text(int argt, int a, uint8_t *o);
 static uint32_t now_ms(void) { return PLAT && PLAT->ms ? PLAT->ms() : 0; }
 
 /* ======================= UI state ======================= */
-enum { PEND_NONE, PEND_FN, PEND_SST, PEND_BST, PEND_SHOW, PEND_ASN, PEND_LBL };
+enum { PEND_NONE, PEND_FN, PEND_SST, PEND_BST, PEND_SHOW, PEND_ASN, PEND_LBL, PEND_CMPL, PEND_ACMPL };
 
 static struct {
   int shift;
@@ -46,6 +46,8 @@ static struct {
   /* catalog */
   int cat, cat_type, cat_idx, cat_run; uint32_t cat_t;
   int off_req;
+  int clock, swd; uint32_t alm_t;
+  uint32_t scroll_t; int scrolling;
 } U;
 
 /* ======================= messages ======================= */
@@ -55,6 +57,7 @@ void show_message(const uint8_t *s, int len) {
   U.msglen = len;
   msg_active = 1;
   FL_SET(FLG_MSG);
+  U.scroll_t = now_ms();
 }
 void show_message_str(const char *s) { show_message((const uint8_t *)s, (int)strlen(s)); }
 void show_view(const val_t *v) {
@@ -293,7 +296,7 @@ typedef struct { uint8_t kind; uint8_t val; const char *label; } mitem_t;
 
 enum {
   M_NONE, M_DISP, M_MODES, M_CLEAR, M_FLAGS, M_PGM, M_STAT, M_PROB, M_BASE, M_CONV,
-  M_MATH, M_ALPHAF, M_MEM, M_CAT, M_ALPHA, M_STK, M_COUNT
+  M_MATH, M_ALPHAF, M_MEM, M_CAT, M_ALPHA, M_STK, M_TIME, M_COUNT
 };
 
 #define FNI(op) { MI_FN, op, 0 }
@@ -328,12 +331,19 @@ static const mitem_t m_alpha[] = {
 static const mitem_t m_stk[]   = { { MI_STK, ARG_ST_X, "ST X" }, { MI_STK, ARG_ST_Y, "ST Y" }, { MI_STK, ARG_ST_Z, "ST Z" },
                                    { MI_STK, ARG_ST_T, "ST T" }, { MI_STK, ARG_ST_L, "ST L" }, BLANK };
 
+static const mitem_t m_time[]  = {
+  FNI(112), FNI(113), FNI(114), FNI(115), FNI(116), FNI(121),
+  FNI(124), FNI(125), FNI(126), FNI(117), FNI(118), FNI(119),
+  FNI(120), FNI(122), FNI(123), FNI(127), FNI(128), FNI(129),
+  FNI(130), FNI(131), FNI(132), FNI(133), FNI(134), FNI(135),
+  FNI(136), FNI(137), FNI(139), FNI(138), BLANK, BLANK };
+
 static const struct { const mitem_t *items; int n; const char *title; } MENUS[M_COUNT] = {
   { 0, 0, 0 },
   { m_disp, 6, "DISP" }, { m_modes, 6, "MODES" }, { m_clear, 6, "CLEAR" }, { m_flags, 6, "FLAGS" },
   { m_pgm, 30, "PGM.FCN" }, { m_stat, 6, "STAT" }, { m_prob, 6, "PROB" }, { m_base, 6, "BASE" },
   { m_conv, 12, "CONVERT" }, { m_math, 12, "MATH" }, { m_alphaf, 12, "ALPHA FNS" }, { m_mem, 6, "MEMORY" },
-  { m_cat, 6, "CATALOG" }, { m_alpha, 30, "ALPHA" }, { m_stk, 6, "STACK" },
+  { m_cat, 6, "CATALOG" }, { m_alpha, 30, "ALPHA" }, { m_stk, 6, "STACK" }, { m_time, 30, "TIME" },
 };
 
 static int cur_menu(void) {
@@ -369,9 +379,25 @@ static void prompt_close(void) { U.pr = 0; U.pr_alpha = 0; U.pr_asn = 0; U.pr_cl
 
 static void cat_start(int type);
 
+static void preview_set(const uint8_t *s, int n);
+static void prompt_complete_exec(int op, int arg);
+/* the last key of a prompt: show the complete instruction, execute on release */
 static void prompt_complete(int arg) {
   int op = U.pr_op;
   prompt_close();
+  uint8_t b[32]; int n = 0;
+  const char *nm = FN[op].name;
+  while (*nm) b[n++] = (uint8_t)*nm++;
+  b[n++] = ' ';
+  if (FN[op].argt == A_SIZE || FN[op].argt == A_DEL) {
+    b[n++] = (uint8_t)('0' + arg / 100); b[n++] = (uint8_t)('0' + (arg / 10) % 10); b[n++] = (uint8_t)('0' + arg % 10);
+  } else if (FN[op].argt == A_CAT) b[n++] = (uint8_t)('0' + arg);
+  else n += arg_text(FN[op].argt, arg, b + n);
+  preview_set(b, n);
+  U.pend = PEND_CMPL; U.pend_op = op; U.pend_arg = arg; U.pend_t = now_ms(); U.pend_null = 0;
+}
+
+static void prompt_complete_exec(int op, int arg) {
   switch (FN[op].argt) {
     case A_SIZE:
       err = 0; FN[op].fn(arg); ui_after_error(); return;
@@ -393,14 +419,31 @@ static void prompt_complete_alpha(void) {
   memcpy(name, U.pr_name, len);
   if (U.pr_clp) { prompt_close(); err = 0; clp_name(name, len); ui_after_error(); return; }
   if (U.pr_asn) { U.pr_asn = 2; U.pr_alpha = 0; return; }
-  prompt_close();
   if (U.pr_dot) { /* GTO . "name" : position only */
+    prompt_close();
     int off = find_global_label(name, len);
     if (off < 0) { show_message_str("NONEXISTENT"); return; }
     S->rsp = 0; goto_off(off);
     return;
   }
+  prompt_close();
   if (len == 0) return;
+  /* show e.g. XEQ "NAME" while the key is held, run on release */
+  {
+    uint8_t b[32]; int n = 0;
+    const char *nm = FN[op].name;
+    while (*nm) b[n++] = (uint8_t)*nm++;
+    b[n++] = op == O_LBL ? 0 : ' ';
+    if (op == O_LBL) n--;
+    b[n++] = CH_TEE;
+    memcpy(b + n, name, len); n += len;
+    preview_set(b, n);
+    memcpy(U.pend_str, name, len); U.pend_slen = len;
+    U.pend = PEND_ACMPL; U.pend_op = op; U.pend_t = now_ms(); U.pend_null = 0;
+  }
+}
+
+static void alpha_complete_exec(int op, const uint8_t *name, int len) {
   if (op == O_LBL) { do_instr(OP_LBLA, 0, name, len); return; }
   if (op == O_GTO) { do_instr(OP_GTOA, 0, name, len); return; }
   if (op == O_XEQ) {
@@ -430,8 +473,8 @@ static void prompt_complete_alpha(void) {
 static int alpha_char(int key, int shift) {
   static const char un[44] = {
     0, 'A','B','C','D','E','F',  'G','H','I','J','K','L',
-    'M','N','O','P', 0,  0,'Q','R','S','T',  0,'U','V','W','X',
-    0,'Y','Z','=','-',  0,' ','.', 0,'+' };
+    0, 'M','N','O', 0,  0,'P','Q','R','S',  0,'T','U','V','W',
+    0,'X','Y','Z','-',  0,' ','.', 0,'+' };
   static const char sh[44] = {
     0, 0,'^',0,0,0,0,  0,'%',0,0,0,0,
     0,0,0,'E',0,  0,'7','8','9','/',  0,'4','5','6','*',
@@ -526,10 +569,10 @@ static void prompt_key(int key) {
     int a = -1;
     if (key >= K_F1 && key <= K_F5) a = m_stk[key - K_F1].val;
     else switch (key) {
-      case K_MUL: a = ARG_ST_X; break;
-      case K_1:   a = ARG_ST_Y; break;
-      case K_2:   a = ARG_ST_Z; break;
-      case K_DIV: a = ARG_ST_T; break;
+      case K_1:   a = ARG_ST_X; break;
+      case K_2:   a = ARG_ST_Y; break;
+      case K_3:   a = ARG_ST_Z; break;
+      case K_4:   a = ARG_ST_T; break;
       case K_TAN: a = ARG_ST_L; break;
       case K_BSP: U.pr_stk = 0; return;
     }
@@ -662,6 +705,7 @@ static int prompt_text(uint8_t *o) {
 
 /* ======================= catalog ======================= */
 static int cat_item(int idx, uint8_t *o) {
+  if (U.cat_type == 4) return tm_alarm_text(idx, o);
   if (U.cat_type == 3) {
     int k = 0;
     for (int i = 1; i < FN_COUNT; i++) {
@@ -697,11 +741,18 @@ static void cat_key(int key) {
   uint8_t b[40];
   switch (key) {
     case K_RUN: U.cat_run = !U.cat_run; U.cat_t = now_ms(); break;
-    case K_DOWN: U.cat_run = 0; if (cat_item(U.cat_idx + 1, b) >= 0) U.cat_idx++; break;
-    case K_UP: U.cat_run = 0; if (U.cat_idx > 0) U.cat_idx--; break;
+    case K_DOWN: U.cat_run = 0; if (cat_item(U.cat_idx + 1, b) >= 0) U.cat_idx++; U.scroll_t = now_ms(); break;
+    case K_UP: U.cat_run = 0; if (U.cat_idx > 0) U.cat_idx--; U.scroll_t = now_ms(); break;
     case K_EXIT: case K_BSP: U.cat = 0; break;
     default: U.cat_run = 0; break;
   }
+}
+
+void ui_clock_mode(int on) { U.clock = on; }
+void ui_sw_mode(int on) { U.swd = on; }
+void ui_almcat(void) {
+  if (!S->nalm) { show_message_str("NO ALARMS"); return; }
+  U.cat = 1; U.cat_type = 4; U.cat_idx = 0; U.cat_run = 0; U.scroll_t = now_ms();
 }
 
 /* ======================= key tables ======================= */
@@ -744,7 +795,7 @@ static const kact_t KT[38][2] = {
   /* 1     */ {{A_DIGIT,'1'},{A_ASNK,0}},
   /* 2     */ {{A_DIGIT,'2'},{A_USER,0}},
   /* 3     */ {{A_DIGIT,'3'},{A_MENU,M_PGM}},
-  /* SUB   */ {{A_FN,O_SUB},{A_PR,76}},
+  /* SUB   */ {{A_FN,O_SUB},{A_MENU,M_TIME}},
   /* EXIT  */ {{A_EXIT,0},{A_OFF,0}},
   /* 0     */ {{A_DIGIT,'0'},{A_NO,0}},
   /* DOT   */ {{A_DOT,0},{A_SHOW,0}},
@@ -762,16 +813,14 @@ static void fn_key(int op) {
   if (op == O_ENTER || op == O_CHS) { /* fall through to normal handling */ }
   if (FN[op].argt != A_NONE) { prompt_open(op); return; }
   terminate_entries();
-  if (prgm_mode()) { do_instr(op, 0, 0, 0); return; }
-  /* execute on release, show the name while held */
+  /* execute (or record in PRGM mode) on release, show the name while held */
   U.pend = PEND_FN; U.pend_op = op; U.pend_arg = 0; U.pend_t = now_ms(); U.pend_null = 0;
   preview_set((const uint8_t *)FN[op].name, (int)strlen(FN[op].name));
 }
 
 static void run_label_key(int lbl) {
   terminate_entries();
-  if (prgm_mode()) { do_instr(O_XEQ, lbl, 0, 0); return; }
-  U.pend = PEND_LBL; U.pend_arg = lbl; U.pend_t = now_ms(); U.pend_null = 0;
+  U.pend = PEND_FN; U.pend_op = O_XEQ; U.pend_arg = lbl; U.pend_t = now_ms(); U.pend_null = 0;
   uint8_t b[16]; int n = 0;
   memcpy(b, "XEQ ", 4); n = 4;
   n += arg_text(A_LBL, lbl, b + n);
@@ -999,9 +1048,13 @@ static void key_release(void) {
   if (U.pend_null) { U.pend_null = 0; return; }
   switch (p) {
     case PEND_FN:
-      err = 0;
-      exec_op(U.pend_op, U.pend_arg, 0, 0);
-      if (err) { stop_running(); ui_after_error(); }
+      do_instr(U.pend_op, U.pend_arg, 0, 0);
+      break;
+    case PEND_CMPL:
+      prompt_complete_exec(U.pend_op, U.pend_arg);
+      break;
+    case PEND_ACMPL:
+      alpha_complete_exec(U.pend_op, U.pend_str, U.pend_slen);
       break;
     case PEND_LBL:
       err = 0; S->rsp = 0;
@@ -1033,6 +1086,13 @@ void hp41_key(int key) {
   }
   if (key == K_SHIFT && !U.pr) { U.shift = !U.shift; return; }
 
+  if (U.clock) { U.clock = 0; U.shift = 0; return; }
+  if (U.swd) {
+    if (key == K_RUN) { if (S->sw_run) { S->sw_acc = tm_sw_value(); S->sw_run = 0; } else { S->sw_start = tm_now_cs(); S->sw_run = 1; } }
+    else if (key == K_BSP && !S->sw_run) S->sw_acc = 0;
+    else if (key == K_EXIT) U.swd = 0;
+    return;
+  }
   if (msg_active) {
     msg_active = 0; FL_CLR(FLG_MSG);
     if ((key == K_BSP || key == K_EXIT) && !U.shift) return;
@@ -1046,11 +1106,13 @@ void hp41_key(int key) {
 void hp41_tick(void) {
   if (!S) return;
   uint32_t t = now_ms();
-  if ((U.pend == PEND_FN || U.pend == PEND_LBL || U.pend == PEND_SST) && !U.pend_null && t - U.pend_t > 1200) {
+  if ((U.pend == PEND_FN || U.pend == PEND_LBL || U.pend == PEND_SST || U.pend == PEND_CMPL || U.pend == PEND_ACMPL)
+      && !U.pend_null && t - U.pend_t >= 1000) {
     U.pend_null = 1;
     preview_set((const uint8_t *)"NULL", 4);
   }
   if (U.paused && (int32_t)(t - U.pause_until) >= 0) U.paused = 0;
+  if (t - U.alm_t >= 1000 || t < U.alm_t) { U.alm_t = t; if (!U.pr) tm_check_alarms(); }
   if (U.cat && U.cat_run && t - U.cat_t > 400) {
     uint8_t b[40];
     U.cat_t = t;
@@ -1060,7 +1122,8 @@ void hp41_tick(void) {
 }
 
 int hp41_busy(void) {
-  return (running ? 1 : 0) | (U.paused ? 2 : 0) | ((U.cat && U.cat_run) ? 4 : 0) | (U.pend != PEND_NONE ? 8 : 0);
+  return (running ? 1 : 0) | (U.paused ? 2 : 0) | ((U.cat && U.cat_run) ? 4 : 0) | (U.pend != PEND_NONE ? 8 : 0)
+       | (U.clock ? 16 : 0) | (U.scrolling ? 32 : 0) | ((U.swd && S->sw_run) ? 64 : 0);
 }
 
 void hp41_run_slice(int steps) {
@@ -1109,13 +1172,19 @@ void hp41_get_display(hp41_disp_t *d) {
 
   if (U.pend && U.pend != PEND_NONE && U.pend_len) {
     memcpy(b, U.pend_txt, U.pend_len); n = U.pend_len;
+  } else if (U.clock) {
+    n = tm_clock_text(b);
+  } else if (U.swd) {
+    n = tm_sw_text(b);
   } else if (U.cat) {
     n = cat_item(U.cat_idx, b); if (n < 0) n = 0;
+    if (U.cat_type == 4) start = -2;
   } else if (U.pr) {
     n = prompt_text(b); start = -1;
     if (cells_len(b, n) <= HP41_CELLS) start = 0;
   } else if (msg_active) {
     memcpy(b, U.msg, U.msglen); n = U.msglen;
+    start = -2;
   } else if (running) {
     int pos = (int)((now_ms() / 120) % HP41_CELLS);
     for (int i = 0; i < HP41_CELLS; i++) b[i] = ' ';
@@ -1146,6 +1215,17 @@ void hp41_get_display(hp41_disp_t *d) {
     entry_text(b, &n, 1);
   } else {
     n = val_format(&S->stk[SX], b);
+  }
+  U.scrolling = 0;
+  if (start == -2) {          /* long message: scroll left after a short pause, like the 41 */
+    int over = cells_len(b, n) - HP41_CELLS;
+    start = 0;
+    if (over > 0) {
+      int32_t el = (int32_t)(now_ms() - U.scroll_t) - 800;
+      int st = el > 0 ? el / 220 : 0;
+      if (st >= over) st = over; else U.scrolling = 1;
+      start = st;
+    }
   }
   cells_from_text(b, n, d, start);
 

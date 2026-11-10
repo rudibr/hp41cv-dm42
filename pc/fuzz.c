@@ -3,7 +3,9 @@
 #include <string.h>
 #include "../core/hp41.h"
 static uint32_t clk; static uint32_t ms(void){return clk;}
-static const hp41_platform_t plat = {0, ms, 0, 0};
+static void gt(hp41_time_t *t){uint32_t s=clk/1000; t->year=2026;t->month=11;t->day=10+s/86400%10;s%=86400;t->hour=s/3600;t->min=s/60%60;t->sec=s%60;t->csec=0;}
+static void st_(const hp41_time_t *t){(void)t;}
+static const hp41_platform_t plat = {0, ms, 0, 0, gt, st_};
 int main(int argc,char**argv){
   int seed = argc>1?atoi(argv[1]):1; srand(seed);
   hp41_set_platform(&plat);

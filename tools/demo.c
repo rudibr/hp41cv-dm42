@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "../core/hp41.h"
 
 static unsigned char fb[70][400];
@@ -9,7 +10,8 @@ static void blk(int x, int y, int w, int h) { for (int j = y; j < y + h; j++) fo
 #include "../dm42/src/seg14.inc"
 
 static uint32_t clk; static uint32_t ms(void) { return clk; }
-static const hp41_platform_t plat = { 0, ms, 0, 0 };
+static void gt(hp41_time_t *t) { uint32_t s = clk / 1000 + 21 * 3600 + 44 * 60; t->year = 2026; t->month = 11; t->day = 10; t->hour = s / 3600 % 24; t->min = s / 60 % 60; t->sec = s % 60; t->csec = clk / 10 % 100; }
+static const hp41_platform_t plat = { 0, ms, 0, 0, gt, 0 };
 static int nframe;
 static const char *names[] = { "", "S+","INV","SQRT","LOG","LN","XEQ","STO","RCL","RDN","SIN","COS","TAN",
   "ENTER","SWAP","CHS","E","BSP","UP","7","8","9","DIV","DOWN","4","5","6","MUL",
@@ -81,7 +83,7 @@ int main(void) {
   k("F1 4 EXIT", "FIX 4", 12);
   k("3 0 SIN", "30 SIN", 18);
   k("SH ENTER", "SHIFT ENTER = ALPHA", 10);
-  k("RCL LN TAN TAN CHS", "H E L L O", 18);
+  k("RCL LN TAN TAN E", "H E L L O", 18);
   k("SH ENTER", "ALPHA off", 8);
   k("SH XEQ . .", "GTO ..", 8);
   k("SH RS", "PRGM mode", 14);
@@ -96,7 +98,20 @@ int main(void) {
   const char *p[] = { "LBL \"CNT\"", "0", "STO 00", "LBL 01", "1", "ST+ 00", "VIEW 00", "PSE", "RCL 00", "5", "X>Y?", "GTO 01", "\"DONE\"", "AVIEW", "END" };
   for (unsigned i = 0; i < sizeof p / sizeof *p; i++) hp41_import_line(p[i], err, 64);
   k("EXIT", "XEQ \"CNT\"", 6);
-  run_frames("XEQ SH ENTER SQRT SWAP DIV SH ENTER", "XEQ \"CNT\": VIEW, PSE, loop", 40);
+  run_frames("XEQ SH ENTER SQRT CHS 4 SH ENTER", "XEQ \"CNT\": VIEW, PSE, loop", 40);
+  /* hold a key: the 41 shows the function, NULL after a second cancels it */
+  hp41_key(K_SIN); clk += 30; hp41_tick(); frame("hold SIN: shows the function", 12);
+  for (int i = 0; i < 110; i++) { clk += 10; hp41_tick(); }
+  frame("keep holding: NULL cancels", 16);
+  hp41_key(0); clk += 30; hp41_tick(); frame("keep holding: NULL cancels", 6);
+  /* time module */
+  k("SH E F1 6 EXIT SH SUB", "SHIFT PRINT: CX time module", 14);
+  k("DOWN F4 UP", "DMY", 6);
+  k("F1", "DATE", 16);
+  k("F5", "DOW", 16);
+  k("BSP F6", "CLOCK", 1);
+  for (int i = 0; i < 6; i++) { clk += 1000; hp41_tick(); frame("CLOCK", 10); }
+  k("EXIT SH E F1 4 EXIT", "", 6);
   k("SH ADD F3 RS", "CAT 3", 6);
   for (int i = 0; i < 8; i++) k("DOWN", "CAT 3", 7);
   k("EXIT", "", 30);

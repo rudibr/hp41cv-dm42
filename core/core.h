@@ -12,7 +12,8 @@
 #define ALPHA_MAX  24
 #define RSTK_MAX   6
 #define STATE_MAGIC   0x34314356u  /* "41CV" */
-#define STATE_VERSION 3
+#define STATE_VERSION 4
+#define MAXALM 10
 
 /* stack indices */
 enum { SX = 0, SY, SZ, ST, SL };
@@ -107,6 +108,11 @@ typedef struct {
   int32_t nasn;
   uint8_t lift;                /* stack lift enabled */
   int32_t sreg;                /* SIGMA REG base */
+  /* time module */
+  uint8_t clk24, clkmode, sw_run, nalm;
+  int64_t sw_acc;              /* stopwatch, centiseconds */
+  int64_t sw_start;            /* absolute cs when started */
+  struct { int64_t due; int64_t rep; uint8_t len; uint8_t msg[24]; } alm[MAXALM];
 } state_t;
 
 extern state_t *S;
@@ -183,6 +189,17 @@ void   start_running(void);
 void   stop_running(void);
 extern int running;
 extern int sst_mode;
+
+/* ---- time module (timemod.c) ---- */
+int64_t tm_now_cs(void);
+int     tm_clock_text(uint8_t *o);
+int     tm_sw_text(uint8_t *o);
+int64_t tm_sw_value(void);
+int     tm_alarm_text(int i, uint8_t *o);
+int     tm_check_alarms(void);
+void    ui_clock_mode(int on);
+void    ui_sw_mode(int on);
+void    ui_almcat(void);
 
 /* ---- ui (ui.c) ---- */
 void   show_message(const uint8_t *s, int len);

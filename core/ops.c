@@ -537,6 +537,36 @@ void f_cat(int a);
 void f_clp(int a);
 void f_asn(int a);
 
+/* time module (timemod.c) */
+void f_date(int a);
+void f_time(int a);
+void f_dateplus(int a);
+void f_ddays(int a);
+void f_dow(int a);
+void f_dmy(int a);
+void f_mdy(int a);
+void f_clk12(int a);
+void f_clk24(int a);
+void f_clock(int a);
+void f_clkt(int a);
+void f_clktd(int a);
+void f_setdate(int a);
+void f_setime(int a);
+void f_tplusx(int a);
+void f_adate(int a);
+void f_atime(int a);
+void f_atime24(int a);
+void f_sw(int a);
+void f_setsw(int a);
+void f_rclsw(int a);
+void f_runsw(int a);
+void f_stopsw(int a);
+void f_xyzalm(int a);
+void f_almcat(int a);
+void f_almnow(int a);
+void f_clralms(int a);
+void f_rclalm(int a);
+
 /* Table order is part of the stored-program format: append only. */
 const fdef_t FN[] = {
   { "",       A_NONE, F_HIDE, f_null },      /* 0 */
@@ -651,5 +681,33 @@ const fdef_t FN[] = {
   { "CAT",    A_CAT,  F_NP, f_cat },
   { "CLP",    A_NONE, F_NP, f_clp },          /* 110 */
   { "ASN",    A_ASN,  F_NP, f_asn },
+  { "DATE", A_NONE, 0, f_date },  /* 112 */
+  { "TIME", A_NONE, 0, f_time },
+  { "DATE+", A_NONE, 0, f_dateplus },
+  { "DDAYS", A_NONE, 0, f_ddays },
+  { "DOW", A_NONE, 0, f_dow },
+  { "DMY", A_NONE, 0, f_dmy },
+  { "MDY", A_NONE, 0, f_mdy },
+  { "CLK12", A_NONE, 0, f_clk12 },
+  { "CLK24", A_NONE, 0, f_clk24 },
+  { "CLOCK", A_NONE, 0, f_clock },
+  { "CLKT", A_NONE, 0, f_clkt },
+  { "CLKTD", A_NONE, 0, f_clktd },
+  { "SETDATE", A_NONE, 0, f_setdate },
+  { "SETIME", A_NONE, 0, f_setime },
+  { "T+X", A_NONE, 0, f_tplusx },
+  { "ADATE", A_NONE, 0, f_adate },
+  { "ATIME", A_NONE, 0, f_atime },
+  { "ATIME24", A_NONE, 0, f_atime24 },
+  { "SW", A_NONE, 0, f_sw },
+  { "SETSW", A_NONE, 0, f_setsw },
+  { "RCLSW", A_NONE, 0, f_rclsw },
+  { "RUNSW", A_NONE, 0, f_runsw },
+  { "STOPSW", A_NONE, 0, f_stopsw },
+  { "XYZALM", A_NONE, 0, f_xyzalm },
+  { "ALMCAT", A_NONE, 0, f_almcat },
+  { "ALMNOW", A_NONE, 0, f_almnow },
+  { "CLRALMS", A_NONE, 0, f_clralms },
+  { "RCLALM", A_NONE, 0, f_rclalm },
 };
 const int FN_COUNT = sizeof(FN) / sizeof(FN[0]);

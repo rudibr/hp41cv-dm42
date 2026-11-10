@@ -63,7 +63,7 @@ static void run_tests(void) {
   T("2 STO + 0 5 RCL 0 5", "44.0000");
   T("RCL 9 9", "0.0000");
   T("RCL 9 9 5", "5_");   /* SIZE 100: R99 exists, '5' starts entry */
-  T("ENTER STO . MUL", "5.0000");
+  T("ENTER STO . 1", "5.0000");
   T("7 STO 0 1 1 STO 0 2 RCL SH 0 2", "7.0000"); /* RCL IND 02 -> R01 */
 
   /* --- conditionals and flags --- */
@@ -75,10 +75,10 @@ static void run_tests(void) {
 
   /* --- alpha --- */
   fresh();
-  T("SH ENTER RCL LN TAN TAN CHS", "HELLO_");
+  T("SH ENTER RCL LN TAN TAN E", "HELLO_");
   T("SH ENTER", "0.0000");
   T("SH ENTER", "HELLO");
-  T("SH ENTER 1 2 ENTER SH ENTER F5 F1 . MUL", "HELLO12.0000");
+  T("SH ENTER 1 2 ENTER SH ENTER F5 F1 . 1", "HELLO12.0000");
   T("F2 0 0", "HELLO12.0000"); /* ASTO 00 */
   T("SH ENTER RCL 0 0", "HELLO1");
 
@@ -86,10 +86,10 @@ static void run_tests(void) {
   fresh();
   T("SH XEQ . .", "0.0000");
   import("LBL \"SQ\"\nX^2\nRTN\n");
-  T("5 XEQ SH ENTER 9 7 SH ENTER", "25.0000");
+  T("5 XEQ SH ENTER DIV 8 SH ENTER", "25.0000");
   T("SH XEQ . .", "25.0000");
   import("LBL \"LOOP\"\n0\nSTO 01\n1.005\nSTO 00\nLBL 01\nRCL 00\nINT\nST+ 01\nISG 00\nGTO 01\nRCL 01\nEND\n");
-  T("XEQ SH ENTER TAN CHS CHS E SH ENTER", "15.0000");
+  T("XEQ SH ENTER TAN E E 7 SH ENTER", "15.0000");
   T("SH RS", "00 REG 213");
   T("DOWN", "01 LBLTLOOP");
   T("DOWN", "02 0");
@@ -128,7 +128,7 @@ static void run_tests(void) {
   T("XEQ SH ENTER S+ SH ENTER", "81.0000");
   T("SH XEQ . .", "81.0000");
   import("LBL \"P\"\n\"HI\"\nPROMPT\n\"|-X\"\nAVIEW\nEND\n");
-  T("XEQ SH ENTER E SH ENTER", "HI");
+  T("XEQ SH ENTER 7 SH ENTER", "HI");
   T("RS", "HIX");
 
   /* catalogs */
@@ -145,7 +145,7 @@ static void run_tests(void) {
   T("SH 8 F1 0 1 0 EXIT", "0.0000");
   T("RCL 1 0", "NONEXISTENT");
   T("BSP SH 1", "ASN _");
-  T("E RDN", "ASN PI_");
+  T("7 RDN", "ASN PI_");
   T("SH ENTER", "ASN PI _");
   T("SIN", "0.0000");
   T("SH 2 SIN", "3.1416");
@@ -191,7 +191,7 @@ static void run_tests(void) {
   fresh();
   T("SH XEQ . .", "0.0000");
   import("LBL \"CNT\"\n1.003\nSTO 00\nLBL 02\nVIEW 00\nISG 00\nGTO 02\n\"DONE\"\nAVIEW\nEND\n");
-  T("XEQ SH ENTER SQRT SWAP DIV SH ENTER", "DONE");
+  T("XEQ SH ENTER SQRT CHS 4 SH ENTER", "DONE");
   T("RCL 0 0", "4.0030");
   hp41_export_program(pr, 0);
 
@@ -199,7 +199,50 @@ static void run_tests(void) {
   fresh();
   T("SH XEQ . .", "0.0000");
   import("; Quadratic solver: enter a, b, c (a ENTER b ENTER c), XEQ \"QUAD\"\n; real roots are left in X and Y, complex -> \"COMPLEX\"\nLBL \"QUAD\"\nSTO 03\nRDN\nSTO 02\nRDN\nSTO 01\nRCL 02\nX^2\n4\nRCL 01\n*\nRCL 03\n*\n-\nX<0?\nGTO 01\nSQRT\nSTO 04\nRCL 02\nCHS\nRCL 04\n-\n2\n/\nRCL 01\n/\nRCL 02\nCHS\nRCL 04\n+\n2\n/\nRCL 01\n/\nRTN\nLBL 01\n\"COMPLEX\"\nAVIEW\nEND\n");
-  T("1 ENTER 3 CHS ENTER 2 XEQ SH ENTER 7 4 S+ LOG SH ENTER", "2.0000");
+  T("1 ENTER 3 CHS ENTER 2 XEQ SH ENTER 8 5 S+ LOG SH ENTER", "2.0000");
   T("SWAP", "1.0000");
-  T("1 ENTER 0 ENTER 1 XEQ SH ENTER 7 4 S+ LOG SH ENTER", "COMPLEX");
+  T("1 ENTER 0 ENTER 1 XEQ SH ENTER 8 5 S+ LOG SH ENTER", "COMPLEX");
+
+  /* holding a key shows the function, NULL after one second cancels it */
+  fresh();
+  keys("2 ENTER 3");
+  hold(K_ADD, 300); total++; if (strcmp(held, "+")) { fails++; printf("FAIL hold preview '%s'\n", held); }
+  T("", "5.0000");
+  keys("4");
+  hold(K_ADD, 1500); total++; if (strcmp(held, "NULL")) { fails++; printf("FAIL hold NULL '%s'\n", held); }
+  T("", "4.0000");
+  keys("STO 0");
+  hold(K_5, 300); total++; if (strcmp(held, "STO 05")) { fails++; printf("FAIL hold STO '%s'\n", held); }
+  T("RCL 0 5", "4.0000");
+  keys("SH RS");
+  hold(K_SIN, 1500); total++; if (strcmp(held, "NULL")) { fails++; printf("FAIL hold PRGM '%s'\n", held); }
+  T("", "00 REG 219");
+  hold(K_SIN, 200);
+  T("", "01 SIN");
+  T("SH RS", "4.0000");
+
+  /* time module */
+  fresh();
+  T("SH E F1 6 EXIT SH SUB F1", "11.102026");
+  T("DOWN F4 UP F1", "10.112026");                 /* DMY, DATE */
+  T("5 0 F3", "30.122026");                        /* DATE+ */
+  T("1 . 0 1 2 0 2 6 ENTER 1 0 . 1 1 2 0 2 6 F4", "313.000000");   /* DDAYS */
+  T("1 0 . 1 1 2 0 2 6 F5", "TUE");                /* DOW */
+  T("BSP", "2.000000");
+  T("EXIT SH ENTER SH BSP SH ENTER 1 0 . 1 1 2 0 2 6 SH SUB DOWN DOWN F4", "10.112026");
+  T("EXIT SH ENTER", "10.11.2026");
+  T("SH ENTER SH ENTER SH BSP SH ENTER SH E F1 4 EXIT 1 3 . 4 5 1 2 SH SUB DOWN DOWN F1 F5", "13.4512");
+  T("EXIT SH ENTER", "13:45:12");
+  T("SH ENTER SH ENTER SH BSP SH ENTER SH SUB DOWN F6 DOWN F5", "13.4512");    /* CLK12, ATIME */
+  T("EXIT SH ENTER", "1:45:12 PM");
+  T("SH ENTER 1 . 0 2 0 3 SH SUB DOWN DOWN DOWN F2 F3", "1.0203"); /* SETSW, RCLSW */
+  /* alarm today at 23:00 with message WAKE, then let the clock run past it */
+  T("EXIT SH ENTER SH BSP MUL S+ COS LN SH ENTER", "1.0203");
+  keys("EXIT 0 ENTER 0 ENTER 2 3 SH SUB DOWN DOWN DOWN F6");
+  T("DOWN F1", "10.11 23:00 WA");
+  for (int i = 0; i < 300; i++) { clk += 10; hp41_tick(); }
+  T("", "11 23:00 WAKE");
+  T("EXIT EXIT", "23.0000");
+  for (int i = 0; i < 2 * 3600 + 60; i++) { clk += 1000; hp41_tick(); }
+  T("", "WAKE");
 }

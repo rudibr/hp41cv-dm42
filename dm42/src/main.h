@@ -2,6 +2,6 @@
 #define __PGM_MAIN_H__
 
 #define PROGRAM_NAME    "HP41CV"
-#define PROGRAM_VERSION "0.1"
+#define PROGRAM_VERSION "0.2"
 
 #endif
