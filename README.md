@@ -12,7 +12,7 @@ Version 0.1. Not yet tested on real hardware.
 
 ## Installing
 
-1. Download `HP41CV.pgm` from the [Releases](../../releases) page.
+1. Download [`release/HP41CV.pgm`](release/HP41CV.pgm) (v0.1).
 2. On the DM42, open SETUP (`SHIFT 0`) → System → Enter System Menu → **Copy to USB disk**,
    then copy `HP41CV.pgm` to the root of the calculator disk. Eject the disk.
 3. SETUP → System → Enter System Menu → **Load Program**, and pick `HP41CV.pgm`.

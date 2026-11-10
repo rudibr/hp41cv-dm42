@@ -6,4 +6,4 @@ pc/render
 tools/demo
 tools/frames/
 *.o
-HP41CV.pgm
+/HP41CV.pgm
