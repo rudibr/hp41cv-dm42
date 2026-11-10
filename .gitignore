@@ -1,0 +1,9 @@
+dm42/build/
+dm42/.dep/
+pc/sim
+pc/fuzz
+pc/render
+tools/demo
+tools/frames/
+*.o
+HP41CV.pgm

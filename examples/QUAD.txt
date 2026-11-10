@@ -1,0 +1,41 @@
+; Quadratic solver: enter a, b, c (a ENTER b ENTER c), XEQ "QUAD"
+; real roots are left in X and Y, complex -> "COMPLEX"
+LBL "QUAD"
+STO 03
+RDN
+STO 02
+RDN
+STO 01
+RCL 02
+X^2
+4
+RCL 01
+*
+RCL 03
+*
+-
+X<0?
+GTO 01
+SQRT
+STO 04
+RCL 02
+CHS
+RCL 04
+-
+2
+/
+RCL 01
+/
+RCL 02
+CHS
+RCL 04
++
+2
+/
+RCL 01
+/
+RTN
+LBL 01
+"COMPLEX"
+AVIEW
+END
