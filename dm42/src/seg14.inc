@@ -114,9 +114,9 @@ static void thick(float x0, float y0, float x1, float y1, float t, int ox, int o
 }
 
 #ifndef CW
-#define CW 24    /* char width  */
-#define CH 40    /* char height */
-#define CPITCH 32
+#define CW 21    /* char width  */
+#define CH 36    /* char height */
+#define CPITCH 29
 #endif
 
 static void draw_char(int x, int y, uint8_t c, uint8_t p) {
@@ -124,8 +124,8 @@ static void draw_char(int x, int y, uint8_t c, uint8_t p) {
   const float W = CW, H = CH, t = 3.2f, g = 1.2f, h2 = H / 2, m = W / 2;
   if (s & SA) { pt_t q[4] = { { t/2+g, 0 }, { W-t/2-g, 0 }, { W-t-g, t }, { t+g, t } }; fill_poly(q, 4, x, y); }
   if (s & SD) { pt_t q[4] = { { t+g, H-t }, { W-t-g, H-t }, { W-t/2-g, H }, { t/2+g, H } }; fill_poly(q, 4, x, y); }
-  if (s & SG1) { pt_t q[6] = { { t/2+g, h2 }, { t+g, h2-t/2 }, { m-g, h2-t/2 }, { m-g+0.01f, h2+t/2 }, { t+g, h2+t/2 }, { t/2+g, h2 } }; fill_poly(q, 5, x, y); }
-  if (s & SG2) { pt_t q[5] = { { m+g, h2-t/2 }, { W-t-g, h2-t/2 }, { W-t/2-g, h2 }, { W-t-g, h2+t/2 }, { m+g, h2+t/2 } }; fill_poly(q, 5, x, y); }
+  if (s & SG1) { pt_t q[6] = { { t/2+g, h2 }, { t+g, h2-t/2 }, { m-0.4f, h2-t/2 }, { m-0.4f+0.01f, h2+t/2 }, { t+g, h2+t/2 }, { t/2+g, h2 } }; fill_poly(q, 5, x, y); }
+  if (s & SG2) { pt_t q[5] = { { m+0.4f, h2-t/2 }, { W-t-g, h2-t/2 }, { W-t/2-g, h2 }, { W-t-g, h2+t/2 }, { m+0.4f, h2+t/2 } }; fill_poly(q, 5, x, y); }
   if (s & SF) { pt_t q[5] = { { 0, t/2+g }, { t, t+g }, { t, h2-t/2-g }, { t/2, h2-g }, { 0, h2-t/2-g } }; fill_poly(q, 5, x, y); }
   if (s & SB) { pt_t q[5] = { { W, t/2+g }, { W-t, t+g }, { W-t, h2-t/2-g }, { W-t/2, h2-g }, { W, h2-t/2-g } }; fill_poly(q, 5, x, y); }
   if (s & SE) { pt_t q[5] = { { 0, h2+t/2+g }, { t/2, h2+g }, { t, h2+t/2+g }, { t, H-t-g }, { 0, H-t/2-g } }; fill_poly(q, 5, x, y); }

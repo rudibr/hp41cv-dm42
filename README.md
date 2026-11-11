@@ -4,7 +4,7 @@ A clean-room HP-41CV for the DM42 (DMCP 3.14 and newer). It contains no HP ROM c
 The calculator works like a 41CV, but it uses the keys as they are printed on the DM42 (the 42S layout).
 41 functions that have no key of their own are in softkey menus under the matching 42S label.
 
-Version 0.2. Not yet tested on real hardware.
+Version 0.3. Not yet tested on real hardware.
 
 ![HP-41CV on the DM42](docs/demo.gif)
 
@@ -23,7 +23,8 @@ If the program ever hangs, press the RESET button on the back of the calculator.
 
 ## Display
 
-The 12-character 14-segment LCD is drawn in the 41's thin-segment style, with the 41 annunciators below it:
+Below the top bar, the screen shows an HP-41: a black case, a metal bezel around the LCD, and the ON / USER / PRGM / ALPHA keys (these are a picture only).
+The 12-character 14-segment LCD is drawn in the 41's thin-segment style, with the 41 annunciators inside the LCD:
 BAT, USER, G, RAD, SHIFT, the flags 0-4, PRGM and ALPHA.
 Messages longer than 12 characters scroll, as on the 41.
 The top bar shows the time, the date (in the DM42's date and time format settings), the current menu name, and the battery voltage or USB.

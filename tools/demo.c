@@ -5,9 +5,10 @@
 #include <math.h>
 #include "../core/hp41.h"
 
-static unsigned char fb[70][400];
-static void blk(int x, int y, int w, int h) { for (int j = y; j < y + h; j++) for (int i = x; i < x + w; i++) if (i >= 0 && i < 400 && j >= 0 && j < 70) fb[j][i] = 1; }
+static unsigned char fb[240][400];
+static void blk(int x, int y, int w, int h) { for (int j = y; j < y + h; j++) for (int i = x; i < x + w; i++) if (i >= 0 && i < 400 && j >= 0 && j < 240) fb[j][i] = 1; }
 #include "../dm42/src/seg14.inc"
+#include "../dm42/src/bg41.h"
 
 static uint32_t clk; static uint32_t ms(void) { return clk; }
 static void gt(hp41_time_t *t) { uint32_t s = clk / 1000 + 21 * 3600 + 44 * 60; t->year = 2026; t->month = 11; t->day = 10; t->hour = s / 3600 % 24; t->min = s / 60 % 60; t->sec = s % 60; t->csec = clk / 10 % 100; }
@@ -20,11 +21,16 @@ static const char *names[] = { "", "S+","INV","SQRT","LOG","LN","XEQ","STO","RCL
 static void frame(const char *cap, int hold) {
   hp41_disp_t d; hp41_get_display(&d);
   memset(fb, 0, sizeof fb);
-  int x0 = (400 - HP41_CELLS * CPITCH) / 2 + 4;
-  for (int i = 0; i < HP41_CELLS; i++) draw_char(x0 + i * CPITCH, 8, d.ch[i], d.punct[i]);
+  /* same drawing as dm42/src/main.c redraw() */
+  for (int i = 0; i < BG_NRUNS; i++) blk(BG_RUNS[i][1], BG_RUNS[i][0], BG_RUNS[i][2], 1);
+  for (int i = 0; i < HP41_CELLS; i++) draw_char(BG_DIGITS_X + i * CPITCH, BG_DIGITS_Y, d.ch[i], d.punct[i]);
+  for (int a = 0; a < 12; a++) {
+    if (!(d.annun & (1u << a))) continue;
+    for (int r = 0; r < AN_IDX[a][1]; r++) { const uint16_t *q = AN_RUNS[AN_IDX[a][0] + r]; blk(q[1], q[0], q[2], 1); }
+  }
   char fn[64]; sprintf(fn, "frames/%03d.pgm", nframe);
-  FILE *f = fopen(fn, "wb"); fprintf(f, "P5\n400 70\n255\n");
-  for (int j = 0; j < 70; j++) for (int i = 0; i < 400; i++) fputc(fb[j][i] ? 0 : 255, f);
+  FILE *f = fopen(fn, "wb"); fprintf(f, "P5\n400 240\n255\n");
+  for (int j = 0; j < 240; j++) for (int i = 0; i < 400; i++) fputc(fb[j][i] ? 0 : 255, f);
   fclose(f);
   sprintf(fn, "frames/%03d.txt", nframe);
   f = fopen(fn, "w");

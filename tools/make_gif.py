@@ -17,9 +17,11 @@ for txt in sorted(glob.glob("frames/*.txt")):
     lines = open(txt, encoding="utf-8").read().split("\n")
     hold, cap, annun, info = int(lines[0]), lines[1], int(lines[2]), lines[3]
     menu = lines[4:10]
+    base = Image.open(txt[:-4] + ".pgm").convert("L")
     scr = Image.new("RGB", (W, H), BG)
+    scr.paste(Image.new("RGB", (W, H), INK), (0, 0), base.point(lambda v: 255 if v < 128 else 0))
     d = ImageDraw.Draw(scr)
-    d.rectangle([0, 0, W, 21], fill=INK)
+    d.rectangle([0, 0, W, 20], fill=INK)
     d.text((6, 2), "21:44  10.11.2026", font=fhdr, fill=BG)
     if info:
         tw = d.textlength(info, font=fhdr)
@@ -29,19 +31,14 @@ for txt in sorted(glob.glob("frames/*.txt")):
     d.rectangle([W - 6, 8, W - 4, 13], fill=BG)
     d.rectangle([W - 28, 7, W - 8, 14], fill=INK)
     d.rectangle([W - 28, 7, W - 11, 14], fill=BG)
-    lcd = Image.open(txt[:-4] + ".pgm").convert("L")
-    mask = lcd.point(lambda v: 255 if v < 128 else 0)
-    scr.paste(Image.new("RGB", lcd.size, INK), (0, 44), mask)
-    for bit, t, x in AN:
-        if annun & bit:
-            d.text((x, 112), t, font=fsm, fill=INK)
     if any(menu):
+        d.rectangle([0, H - 33, W, H], fill=BG)
         y = H - 30
         for i in range(6):
             x = 2 + i * 66
-            d.rounded_rectangle([x, y, x + 62, y + 26], radius=4, fill=INK)
+            d.rounded_rectangle([x, y, x + 62, y + 28], radius=4, fill=INK)
             tw = d.textlength(menu[i], font=fmenu)
-            d.text((x + 31 - tw / 2, y + 5), menu[i], font=fmenu, fill=BG)
+            d.text((x + 31 - tw / 2, y + 6), menu[i], font=fmenu, fill=BG)
     scr = scr.resize((int(W * S), int(H * S)), Image.NEAREST)
     pad = 16
     out = Image.new("RGB", (scr.width + 2 * pad, scr.height + 2 * pad + 40), FRAME)

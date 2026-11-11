@@ -43,6 +43,7 @@ static const hp41_platform_t plat = { p_beep, p_ms, 0, p_keep_on, p_get_time, p_
 
 static void blk(int x, int y, int w, int h) { if (w > 0 && h > 0) lcd_fill_rect(x, y, w, h, 1); }
 #include "seg14.inc"
+#include "bg41.h"
 
 static const char *ascii_label(const char *s, char *buf, int len) {
   if (!s) return 0;
@@ -135,25 +136,20 @@ static void redraw(void) {
     t20->lnfill = 1; t20->newln = 1;
   }
 
-  /* LCD window frame */
-  int y0 = 52;
-  int x0 = (LCD_X - HP41_CELLS * CPITCH) / 2 + 4;
-  for (int i = 0; i < HP41_CELLS; i++) draw_char(x0 + i * CPITCH, y0, d.ch[i], d.punct[i]);
+  /* HP-41 case, bezel and keys (static picture) */
+  for (int i = 0; i < BG_NRUNS; i++) lcd_fill_rect(BG_RUNS[i][1], BG_RUNS[i][0], BG_RUNS[i][2], 1, 1);
 
-  /* annunciators */
-  static const struct { uint32_t bit; const char *txt; int x; } an[] = {
-    { AN_BAT, "BAT", 6 }, { AN_USER, "USER", 48 }, { AN_G, "G", 112 }, { AN_RAD, "RAD", 124 },
-    { AN_SHIFT, "SHIFT", 172 }, { AN_0, "0", 236 }, { AN_1, "1", 248 }, { AN_2, "2", 260 },
-    { AN_3, "3", 272 }, { AN_4, "4", 284 }, { AN_PRGM, "PRGM", 302 }, { AN_ALPHA, "ALPHA", 352 },
-  };
-  int ya = y0 + CH + 14;
-  for (unsigned i = 0; i < sizeof an / sizeof an[0]; i++) {
-    if (!(d.annun & an[i].bit)) continue;
-    lcd_setXY(t20, an[i].x, ya);
-    t20->newln = 0;
-    lcd_puts(t20, an[i].txt);
+  /* the 12 LCD characters */
+  for (int i = 0; i < HP41_CELLS; i++) draw_char(BG_DIGITS_X + i * CPITCH, BG_DIGITS_Y, d.ch[i], d.punct[i]);
+
+  /* annunciators inside the LCD, in the 41's order */
+  for (int a = 0; a < 12; a++) {
+    if (!(d.annun & (1u << a))) continue;
+    for (int r = 0; r < AN_IDX[a][1]; r++) {
+      const uint16_t *q = AN_RUNS[AN_IDX[a][0] + r];
+      lcd_fill_rect(q[1], q[0], q[2], 1, 1);
+    }
   }
-  t20->newln = 1;
 
   if (d.has_menu) {
     static char lb[6][16];
