@@ -6,11 +6,11 @@ F = "/usr/share/fonts/truetype/dejavu/"
 fsm = ImageFont.truetype(F + "DejaVuSansCondensed-Bold.ttf", 13)
 fmenu = ImageFont.truetype(F + "DejaVuSansCondensed-Bold.ttf", 14)
 fhdr = ImageFont.truetype(F + "DejaVuSansCondensed-Bold.ttf", 15)
-fcap = ImageFont.truetype(F + "DejaVuSans-Bold.ttf", 18)
+fcap = ImageFont.truetype(F + "DejaVuSans-Bold.ttf", 14)
 INK, BG, FRAME = (20, 24, 22), (205, 212, 196), (40, 40, 44)
 AN = [(1, "BAT", 6), (2, "USER", 48), (4, "G", 112), (8, "RAD", 124), (16, "SHIFT", 172), (32, "0", 236),
       (64, "1", 248), (128, "2", 260), (256, "3", 272), (512, "4", 284), (1024, "PRGM", 302), (2048, "ALPHA", 352)]
-S = 1.5
+S = 1
 W, H = 400, 240
 frames, durs = [], []
 for txt in sorted(glob.glob("frames/*.txt")):
@@ -41,7 +41,7 @@ for txt in sorted(glob.glob("frames/*.txt")):
             d.text((x + 31 - tw / 2, y + 6), menu[i], font=fmenu, fill=BG)
     scr = scr.resize((int(W * S), int(H * S)), Image.NEAREST)
     pad = 16
-    out = Image.new("RGB", (scr.width + 2 * pad, scr.height + 2 * pad + 40), FRAME)
+    out = Image.new("RGB", (scr.width + 2 * pad, scr.height + 2 * pad + 30), FRAME)
     out.paste(scr, (pad, pad))
     od = ImageDraw.Draw(out)
     if cap:
