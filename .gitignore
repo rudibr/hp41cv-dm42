@@ -7,3 +7,4 @@ tools/demo
 tools/frames/
 *.o
 /HP41CV.pgm
+tools/mock/strip

@@ -1073,8 +1073,11 @@ static void key_release(void) {
 }
 
 void hp41_key(int key) {
+  static int down_key;
   if (!S) return;
-  if (key == 0) { key_release(); return; }
+  if (key == 0) { down_key = 0; key_release(); return; }
+  if (key == down_key) return;     /* auto-repeat of a held key: the 41 has none */
+  down_key = key;
   if (U.pend) key_release();   /* safety: missed release */
   if (key > K_LAST) return;
 

@@ -113,9 +113,11 @@ static void thick(float x0, float y0, float x1, float y1, float t, int ox, int o
   fill_poly(p, 4, ox, oy);
 }
 
+#ifndef CW
 #define CW 24    /* char width  */
 #define CH 40    /* char height */
 #define CPITCH 32
+#endif
 
 static void draw_char(int x, int y, uint8_t c, uint8_t p) {
   uint16_t s = seg_of(c);

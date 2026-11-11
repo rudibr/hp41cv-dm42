@@ -65,9 +65,31 @@ static const char *ascii_label(const char *s, char *buf, int len) {
 
 static int show_stack = 0;   /* optional Y/Z/T helper line (off = authentic) */
 
+/* Redraw only when something visible changed: refreshing the LCD while a key is
+   held made the screen flicker. */
+static struct {
+  hp41_disp_t d;
+  int min, hour, day, mv, usb, blink;
+} last_sig;
+static int force_redraw = 1;
+
 static void redraw(void) {
   hp41_disp_t d;
   hp41_get_display(&d);
+  {
+    __typeof__(last_sig) sig;
+    memset(&sig, 0, sizeof sig);
+    sig.d = d;
+    tm_t tm; dt_t dt;
+    rtc_read(&tm, &dt);
+    sig.min = tm.min; sig.hour = tm.hour; sig.day = dt.day;
+    sig.usb = usb_powered();
+    sig.mv = sig.usb ? 0 : get_vbat() / 100;
+    sig.blink = get_lowbat_state() ? (int)((sys_current_ms() / 500) % 2) : 0;
+    if (!force_redraw && !memcmp(&sig, &last_sig, sizeof sig)) return;
+    last_sig = sig;
+    force_redraw = 0;
+  }
   lcd_clear_buf();
 
   /* header: time and date on the left, menu title in the middle, battery on the right */
@@ -141,6 +163,20 @@ static void redraw(void) {
   }
   (void)show_stack;
   lcd_refresh();
+}
+
+/* ================= key state ================= */
+/* DMCP repeats a held key. The 41 has no auto-repeat, and a repeated press would
+   run the pending function and restart the preview (no NULL, flicker). */
+static int held_key;
+static int phys_down(int k) {
+  int k1 = 0, k2 = 0;
+  int n = __sysfn_read_key(&k1, &k2);   /* key matrix, DMCP library call */
+  return n > 0 && (k1 == k || k2 == k);
+}
+static void release_held(void) {
+  held_key = 0;
+  hp41_key(0);
 }
 
 /* ================= persistence ================= */
@@ -352,6 +388,7 @@ void program_main(void) {
           rtc_wakeup_delay();
           CLR_ST(STAT_OFF);
           reset_auto_off();
+          force_redraw = 1;
           redraw();
         }
         continue;
@@ -383,6 +420,8 @@ void program_main(void) {
       hp41_set_lowbat(get_lowbat_state());
       hp41_wakeup();
       key_pop_all();        /* swallow the wake-up key */
+      held_key = 0;
+      force_redraw = 1;
       redraw();
       continue;
     }
@@ -402,13 +441,30 @@ void program_main(void) {
         handle_menu(&MID_MENU, MENU_RESET, 0);
         CLR_ST(STAT_MENU);
         wait_for_key_release(-1);
+        held_key = 0;
+        force_redraw = 1;
         redraw();
         continue;
       }
-      if (key >= 0) hp41_key(key);
+      if (key == 0) {
+        if (held_key && phys_down(held_key)) continue;   /* bounce: key is still down */
+        release_held();
+      } else if (key > 0 && key <= K_LAST) {
+        if (key == held_key) continue;                     /* auto-repeat: ignore */
+        if (held_key) release_held();
+        held_key = key;
+        hp41_key(key);
+      }
       if (hp41_wants_off()) { SET_ST(STAT_PGM_END); continue; }
       redraw();
       last_draw = sys_current_ms();
+      continue;
+    }
+
+    if (held_key && !phys_down(held_key) && (busy & 8)) {
+      /* the release event may have been lost: trust the key matrix */
+      release_held();
+      redraw();
       continue;
     }
 

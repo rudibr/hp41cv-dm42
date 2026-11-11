@@ -245,4 +245,14 @@ static void run_tests(void) {
   T("EXIT EXIT", "23.0000");
   for (int i = 0; i < 2 * 3600 + 60; i++) { clk += 1000; hp41_tick(); }
   T("", "WAKE");
+
+  /* auto-repeat while holding must not execute the function */
+  fresh();
+  keys("7");
+  hp41_key(K_SQRT);
+  for (int t = 0; t < 1500; t += 10) { clk += 10; hp41_tick(); if (t % 100 == 0) hp41_key(K_SQRT); }
+  hp41_display_text(held, sizeof held);
+  total++; if (strcmp(held, "NULL")) { fails++; printf("FAIL repeat NULL '%s'\n", held); }
+  hp41_key(0); clk += 20; hp41_tick(); settle();
+  T("", "7.0000");
 }
