@@ -8,3 +8,6 @@ tools/frames/
 *.o
 /HP41CV.pgm
 tools/mock/strip
+tools/font/table
+tools/font/dbg
+tools/font/*.pgm
