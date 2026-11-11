@@ -1173,7 +1173,11 @@ void hp41_get_display(hp41_disp_t *d) {
   int start = 0;
   if (!S) return;
 
-  if (U.pend && U.pend != PEND_NONE && U.pend_len) {
+  /* a function key shows its name only when held for a moment (300 ms), so quick
+     key presses don't flash the name; prompts, SST/BST and SHOW show at once */
+  int show_pend = U.pend && U.pend_len &&
+                  (U.pend != PEND_FN || U.pend_null || now_ms() - U.pend_t >= 300);
+  if (show_pend) {
     memcpy(b, U.pend_txt, U.pend_len); n = U.pend_len;
   } else if (U.clock) {
     n = tm_clock_text(b);

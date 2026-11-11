@@ -206,7 +206,10 @@ static void run_tests(void) {
   /* holding a key shows the function, NULL after one second cancels it */
   fresh();
   keys("2 ENTER 3");
-  hold(K_ADD, 300); total++; if (strcmp(held, "+")) { fails++; printf("FAIL hold preview '%s'\n", held); }
+  hold(K_ADD, 100); total++; if (strcmp(held, "3.0000")) { fails++; printf("FAIL quick press shows '%s'\n", held); }
+  T("", "5.0000");
+  keys("2 ENTER 3");
+  hold(K_ADD, 400); total++; if (strcmp(held, "+")) { fails++; printf("FAIL hold preview '%s'\n", held); }
   T("", "5.0000");
   keys("4");
   hold(K_ADD, 1500); total++; if (strcmp(held, "NULL")) { fails++; printf("FAIL hold NULL '%s'\n", held); }
@@ -217,7 +220,7 @@ static void run_tests(void) {
   keys("SH RS");
   hold(K_SIN, 1500); total++; if (strcmp(held, "NULL")) { fails++; printf("FAIL hold PRGM '%s'\n", held); }
   T("", "00 REG 219");
-  hold(K_SIN, 200);
+  hold(K_SIN, 400);
   T("", "01 SIN");
   T("SH RS", "4.0000");
 
