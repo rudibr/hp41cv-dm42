@@ -138,6 +138,20 @@ The format is one instruction per line, with optional line numbers. For example:
 `|-` (or `"|-text"`) appends to ALPHA. Σ can be written as `SUM` (`SUM+`, `CLSUM`, `SUMREG`).
 ≠ and ≤ can be written `#` and `<=`.
 
+## Self test
+
+`examples/SELFTST1.txt` (`XEQ "TEST1"`, 75 tests) and `examples/SELFTST2.txt` (`XEQ "TEST2"`, 62 tests)
+check the built-in functions against known results:
+- **SELFTST1:** arithmetic, math, trigonometry in all angle modes, conversions, the stack, registers incl. IND and stack arguments, and ISG/DSE.
+- **SELFTST2:** flags, all conditionals, ALPHA, statistics, local/IND XEQ and GTO, the errors (caught with flag 25), and the CX date functions.
+
+Load one at a time with SETUP → Load program, set SIZE 036 or more, and run it.
+- A failed test stops with `ERR nnn` and a tone. Look up `nnn` in the comments in the .txt file, then press R/S to continue.
+- At the end the display shows `ALL OK n` or `FAILS: n`.
+- Display mode, angle mode, ΣREG, DMY/MDY and digit grouping are restored afterwards. It uses R20–R35.
+
+`tools/gen_selftest.py` generates both files.
+
 ## What is (and is not) included
 
 **Included.** The full 41CV built-in function set plus the CX time module: stack, LASTX, registers incl. IND and stack arguments, alpha data in registers, flags 0-55 with the 41's system flags, FIX/SCI/ENG with flags 28/29, statistics, conversions, OCT/DEC, ISG/DSE, conditionals, local and global labels, 6 subroutine levels, PSE/VIEW/AVIEW/PROMPT, error ignore (flag 25), range ignore (flag 24), auto-start (flag 11), USER mode with ASN, CAT 1/3, SIZE, and 319 registers shared between data, programs and key assignments, with 41 byte counts.
