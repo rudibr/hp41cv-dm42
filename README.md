@@ -4,7 +4,7 @@ A clean-room HP-41CV for the DM42 (DMCP 3.14 and newer). It contains no HP ROM c
 The calculator works like a 41CV, but it uses the keys as they are printed on the DM42 (the 42S layout).
 41 functions that have no key of their own are in softkey menus under the matching 42S label.
 
-Version 0.3. Not yet tested on real hardware.
+Version 0.3.2. Runs on a real DM42 and passes its own self test (see below).
 
 ![HP-41CV on the DM42](docs/demo.gif)
 
@@ -151,6 +151,12 @@ Load one at a time with SETUP → Load program, set SIZE 036 or more, and run it
 - Display mode, angle mode, ΣREG, DMY/MDY and digit grouping are restored afterwards. It uses R20–R35.
 
 `tools/gen_selftest.py` generates both files.
+
+Both parts pass on a real DM42:
+
+| `XEQ "TEST1"` | `XEQ "TEST2"` |
+|---|---|
+| ![TEST1: ALL OK 75 on a DM42](docs/selftest1_dm42.jpg) | ![TEST2: ALL OK 62 on a DM42](docs/selftest2_dm42.jpg) |
 
 ## What is (and is not) included
 
